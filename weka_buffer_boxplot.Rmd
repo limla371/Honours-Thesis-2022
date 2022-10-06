@@ -1,0 +1,76 @@
+---
+title: "weka_buffer_plots"
+output: html_document
+date: "2022-09-01"
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+#making a barplot
+raw_reads <- c(78541734, 79982212, 82062117, 93366714,85165521, 85246606)
+
+barplot(raw_reads,
+xlab = "Library",
+ylab = "Number of raw reads",
+names.arg = c("S1", "S2", "S3", "S1", "S2", "S3"),
+horiz = TRUE)
+```
+
+```{r}
+#back to abundance plots
+install.packages("tidyverse")
+install.packages("permute")
+install.packages("lattice")
+install.packages("zoo")
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+library(vegan)
+library(zoo)
+library(readr)
+install.packages("ggpubr")
+library(ggpubr)
+```
+
+```{r}
+buffer_boxplot <- read_csv("/Users/laurenlim/Desktop/weka_buffer_boxplot.csv")
+buffer_boxplot <- buffer_boxplot[-c(21, 22),]
+buffer_boxplot <- buffer_boxplot[,c(3, 5)]
+colnames(buffer_boxplot) <- c("buffer","concentration")
+
+p <- ggplot(buffer_boxplot, aes(x=buffer, y= concentration, fill=buffer)) + geom_boxplot() + geom_jitter (colour="black", size=2, alpha=0.2) + ggtitle ("RNA concentrations")
+
+p <- p + stat_compare_means(method = "t.test")
+
+p + stat_compare_means( aes(label = ..p.signif..), 
+                        label.x = 1.5, label.y = 40)
+```
+
+concentration <- buffer_boxplot[,2]
+buffer <- buffer_boxplot[,1]
+
+concentration_matrix <- as.matrix(concentration)
+DNA_RNA_shield <- concentration_matrix[(1:20),]
+RNA_Later <- concentration_matrix[(21:42),]
+
+t_concentration_matrix <- t(as.matrix(merge(zoo(DNA_RNA_shield), zoo(RNA_Later))))
+class(concentration_matrix) <- "numeric"
+
+rownames(t_concentration_matrix) <- c("DNA/RNA Shield", "RNA Later")
+
+t_concentration_matrix <- t(t_concentration_matrix)
+```
+
+```{r}
+
+
+
+buffer_matrix <- cbind (concentration_matrix, buffer)
+
+DNA_RNA_shield <- buffer_boxplot_matrix[(1:20),]
+RNA_Later <- buffer_boxplot_matrix[(21:42),]
+
+```
+
+
+
