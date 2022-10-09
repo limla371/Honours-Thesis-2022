@@ -1,0 +1,220 @@
+---
+title: "weka abundance"
+output: html_document
+date: '2022-08-12'
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries
+
+```{r}
+install.packages("tidyverse")
+install.packages("permute")
+install.packages("lattice")
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+library(vegan)
+install.packages("zoo")
+library(zoo)
+library(ggpubr)
+```
+
+Table
+
+for R on citrix: 
+weka_raw <- read_csv("\\\\student.otago.ac.nz/mds/Profiles-V2/l/limla371/RedirectedFolders/Documents/lauren_data.csv")
+[rows,columns]
+```{r}
+library(readr)
+weka_raw <- read_csv("/Users/laurenlim/Desktop/lauren_data.csv")
+weka_raw <- weka_raw[1:6,]
+meta_data <- weka_raw[,2:3]
+rownames(meta_data) <- weka_raw$Library
+meta_data <- meta_data%>%mutate(age = as.factor(Spur.age), buffer =  as.factor(Storage.buffer))
+```
+
+Total abundance
+```{r}
+weka_norm <- sweep(weka_raw[,-c(1:3)], 1, rowSums(weka_raw[,-c(1:3)]),"/")
+rowSums(weka_norm)
+rownames(weka_norm) <- weka_raw$Library
+
+#transpose
+t_weka <- t(weka_norm)
+
+#melt
+melt_t_weka <- melt(t_weka)
+
+colnames(melt_t_weka) <- c("Family","Library","Abundance")
+
+#plot
+ggplot(melt_t_weka, aes(fill=Family,y=Abundance, x=Library)) +             
+  geom_bar(position="fill", stat="identity")
+
+#split by V and I, change colour
+```
+
+Total viral richness
+```{r}
+shannon <- apply(weka_norm, 1, diversity, index="shannon")
+shannon
+
+#try simpson and others
+
+#boxplot
+shannon_matrix <- as.matrix(shannon)
+shannon_matrix_age <- cbind (shannon_matrix, meta_data$Spur.age)
+shannon_matrix_age_buffer <- cbind(shannon_matrix_age, meta_data$Storage.buffer)
+colnames(shannon_matrix_age_buffer) <- c("Shannon", "Age", "Buffer")
+
+#extract age
+spur_age1 <- shannon_matrix_age_buffer [1:2,]
+spur_age2 <- shannon_matrix_age_buffer [3:4,]
+spur_age3 <- shannon_matrix_age_buffer [5:6,]
+
+shannon_matrix <- t(as.matrix(merge(zoo(spur_age1[,1]), zoo(spur_age2[,1]), zoo(spur_age3[,1]))))
+class(shannon_matrix) <- "numeric"
+
+rownames(shannon_matrix) <- c("S1", "S2", "S3")
+
+t_shannon_matrix <- t(shannon_matrix)
+melt_t_shannon_matrix <- melt(t_shannon_matrix)
+
+colnames(melt_t_shannon_matrix) <- c("Buffer", "Spur Age", "Shannon")
+
+#plot
+p <- ggplot(melt_t_shannon_matrix, aes(x=`Spur Age`, y= Shannon, fill=`Spur Age`)) +
+  geom_boxplot() + geom_jitter (colour="black", size=2, alpha=0.2) + ggtitle ("Shannon by Spur Age")
+
+p <- p + stat_compare_means(method = "kruskal.test")
+
+p
+
+ordered_shannon <- melt_t_shannon_matrix [c(1,4,2,5,3,6), ]
+
+kruskal.test(Shannon ~ `Spur Age`,  data = ordered_shannon)
+
+pairwise.wilcox.test(melt_t_shannon_matrix$Shannon, melt_t_shannon_matrix$`Spur Age`,
+                p.adjust.method = "BH")
+
+melt_t_shannon_matrix$`Spur Age` <- ordered(melt_t_shannon_matrix$`Spur Age`,
+                         levels = c(1,2,3))
+
+levels (melt_t_shannon_matrix$`Spur Age`)
+                
+#extract buffer
+RNA_DNA_shield <- shannon_matrix_age_buffer[c(1,3,5)]
+RNA_Later <- shannon_matrix_age_buffer [c(2,4,6)]
+
+shannon_matrix <- t(as.matrix(merge(zoo(RNA_DNA_shield), zoo(RNA_Later))))
+class(shannon_matrix) <- "numeric"
+
+rownames(shannon_matrix) <- c("RNA/DNA Shield", "RNA Later")
+
+t_shannon_matrix <- t(shannon_matrix)
+melt_t_shannon_matrix <- melt(t_shannon_matrix)
+
+colnames(melt_t_shannon_matrix) <- c("Spur Age", "Buffer", "Shannon")
+
+#plot
+p <- ggplot(melt_t_shannon_matrix, aes(x=Buffer, y= Shannon, fill=Buffer)) +
+  geom_boxplot() + geom_jitter (colour="black", size=2, alpha=0.2) + ggtitle ("Shannon by Buffer")
+
+p <- p + stat_compare_means(method = "t.test")
+
+p + stat_compare_means(aes(label = ..p.signif..)
+p
+```
+
+Vertebrate only abundance
+```{r}
+weka_raw_vertebrateonly <- weka_raw [,1:6]
+meta_data_v <- weka_raw_vertebrateonly[,2:3]
+rownames(meta_data_v) <- weka_raw_vertebrateonly$Library
+meta_data_v <- meta_data_v%>%mutate(age = as.factor(Spur.age), buffer =  as.factor(Storage.buffer))
+weka_norm_v <- sweep(weka_raw_vertebrateonly[,-c(1:3)], 1, rowSums(weka_raw_vertebrateonly[,-c(1:3)]),"/")
+rowSums(weka_norm_v)
+rownames(weka_norm_v) <- weka_raw_vertebrateonly$Library
+t_weka_v <- t(weka_norm_v)
+melt_t_weka_v <- melt(t_weka_v)
+colnames(melt_t_weka_v) <- c("Family","Library","Abundance")
+
+ggplot(melt_t_weka_v, aes(fill=Family,y=Abundance, x=Library)) +             
+  geom_bar(position="fill", stat="identity")
+```
+
+Vertebrate only richness
+```{r}
+shannon_v <- apply(weka_norm_v, 1, diversity, index="shannon")
+
+#try simpson and others
+
+#boxplot
+shannon_matrix_v <- as.matrix(shannon_v)
+shannon_matrix_age_v <- cbind (shannon_matrix_v, meta_data$Spur.age)
+shannon_matrix_age_buffer_v <- cbind(shannon_matrix_age_v, meta_data$Storage.buffer)
+colnames(shannon_matrix_age_buffer_v) <- c("Shannon", "Age", "Buffer")
+
+#extract age
+spur_age1_v <- shannon_matrix_age_buffer_v [1:2,]
+spur_age2_v <- shannon_matrix_age_buffer_v [3:4,]
+spur_age3_v <- shannon_matrix_age_buffer_v [5:6,]
+
+shannon_matrix_v <- t(as.matrix(merge(zoo(spur_age1_v[,1]), zoo(spur_age2_v[,1]), zoo(spur_age3_v[,1]))))
+class(shannon_matrix_v) <- "numeric"
+
+rownames(shannon_matrix_v) <- c("S1", "S2", "S3")
+
+t_shannon_matrix_v <- t(shannon_matrix_v)
+melt_t_shannon_matrix_v <- melt(t_shannon_matrix_v)
+
+colnames(melt_t_shannon_matrix_v) <- c("Buffer", "Spur Age", "Shannon")
+
+#plot
+p <- ggplot(melt_t_shannon_matrix_v, aes(x=`Spur Age`, y= Shannon, fill=`Spur Age`)) +
+  geom_boxplot() + geom_jitter (colour="black", size=2, alpha=0.2) + ggtitle ("Shannon by Spur Age")
+
+p <- p + stat_compare_means(method = "kruskal.test")
+
+p
+
+ordered_shannon_v <- melt_t_shannon_matrix_v [c(1,4,2,5,3,6),]
+
+kruskal.test(Shannon ~ `Spur Age`, data = ordered_shannon_v)
+
+pairwise.wilcox.test(melt_t_shannon_matrix_v$Shannon, melt_t_shannon_matrix_v$`Spur Age`,
+                p.adjust.method = "BH")
+
+melt_t_shannon_matrix_v$`Spur Age` <- ordered(melt_t_shannon_matrix_v$`Spur Age`,
+                         levels = c(1,2,3))
+
+levels (melt_t_shannon_matrix_v$`Spur Age`)
+```
+
+## Presence/absence heatmaps
+
+```{r PA heatmaps}
+
+# Create presence/absence matrix
+presence.absence = weka_norm
+presence.absence[presence.absence>0] = 1
+
+# Cluster columns 
+dist.pa.col = vegdist(t(presence.absence), method = "bray")
+pa.col.clus = hclust(dist.pa.col, "aver")
+# Cluster rows
+dist.pa.rows = vegdist(presence.absence, method = "bray")
+pa.row.clus = hclust(dist.pa.rows, "aver")
+# Plot heatmap
+heatmap(as.matrix(presence.absence), Rowv = as.dendrogram(pa.row.clus), Colv = as.dendrogram(pa.col.clus), margins = c(10, 3), col=c("light grey", "dark green"))
+```
+
+
+
+
